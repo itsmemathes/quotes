@@ -1,152 +1,63 @@
+<!-- templates/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Caption Generator</title>
-    <link rel="stylesheet" href="/static/css/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>AI Caption Generator</h1>
-            <p>Search any topic and get 10 beautiful captions instantly</p>
-        </div>
-        
-        <div class="generator-card">
-            <div class="form-group">
-                <label for="topic-search"><i class="fas fa-search"></i> Search Topic</label>
-                <div class="search-container">
-                    <input type="text" id="topic-search" placeholder="Type a topic (love, friend, money, life...)">
-                    <div id="suggestions" class="suggestions-box"></div>
-                </div>
-            </div>
-            
-            <button id="generate-btn" class="btn btn-primary">
-                <i class="fas fa-magic"></i> Generate Captions
-            </button>
-        </div>
-        
-        <div class="results" id="results">
-            <h2><i class="fas fa-quote-left"></i> Generated Captions</h2>
-            <div id="captions-container" class="captions-grid"></div>
-        </div>
+        <h1>AI Caption Generator</h1>
+        <input type="text" id="topicInput" placeholder="Type a topic (love, travel, life...)">
+        <button onclick="generateCaptions()">🎯 Generate Captions</button>
+        <div id="loader" class="loader" style="display: none;">Generating...</div>
+        <div id="captionsList"></div>
     </div>
 
     <script>
-        // Available topics
-        const availableTopics = ['love', 'friendship', 'money', 'success', 'life', 
-                                'motivation', 'happiness', 'family', 'work', 'travel'];
-        
-        const searchInput = document.getElementById('topic-search');
-        const suggestionsBox = document.getElementById('suggestions');
-        const generateBtn = document.getElementById('generate-btn');
-        
-        // Show suggestions when typing
-        searchInput.addEventListener('input', function() {
-            const input = this.value.toLowerCase();
-            suggestionsBox.innerHTML = '';
-            
-            if (input.length > 0) {
-                const matches = availableTopics.filter(topic => 
-                    topic.includes(input)
-                );
-                
-                matches.forEach(match => {
-                    const div = document.createElement('div');
-                    div.className = 'suggestion-item';
-                    div.textContent = match;
-                    div.addEventListener('click', function() {
-                        searchInput.value = match;
-                        suggestionsBox.innerHTML = '';
+        function generateCaptions() {
+            const topic = document.getElementById("topicInput").value;
+            const loader = document.getElementById("loader");
+            const captionsDiv = document.getElementById("captionsList");
+
+            loader.style.display = "block";
+            captionsDiv.innerHTML = "";
+
+            fetch("/generate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ topic })
+            })
+            .then(response => response.json())
+            .then(data => {
+                loader.style.display = "none";
+                if (data.captions) {
+                    data.captions.forEach(caption => {
+                        const card = document.createElement("div");
+                        card.className = "caption-card";
+
+                        const text = document.createElement("div");
+                        text.className = "caption-text";
+                        text.innerText = caption;
+
+                        const copyBtn = document.createElement("button");
+                        copyBtn.className = "copy-btn";
+                        copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
+                        copyBtn.onclick = () => {
+                            navigator.clipboard.writeText(caption);
+                            copyBtn.innerHTML = '<i class="fas fa-check"></i>';
+                            setTimeout(() => copyBtn.innerHTML = '<i class="fas fa-copy"></i>', 1500);
+                        };
+
+                        card.appendChild(text);
+                        card.appendChild(copyBtn);
+                        captionsDiv.appendChild(card);
                     });
-                    suggestionsBox.appendChild(div);
-                });
-                
-                if (matches.length > 0) {
-                    suggestionsBox.style.display = 'block';
                 } else {
-                    suggestionsBox.style.display = 'none';
+                    captionsDiv.innerHTML = "<p>Error: Failed to generate captions</p>";
                 }
-            } else {
-                suggestionsBox.style.display = 'none';
-            }
-        });
-        
-        // Hide suggestions when clicking elsewhere
-        document.addEventListener('click', function(e) {
-            if (e.target.id !== 'topic-search') {
-                suggestionsBox.style.display = 'none';
-            }
-        });
-        
-        // Generate captions
-        generateBtn.addEventListener('click', generateCaptions);
-        
-        async function generateCaptions() {
-            const topic = document.getElementById('topic-search').value.trim().toLowerCase();
-            
-            if (!topic) {
-                alert('Please enter a topic to search');
-                return;
-            }
-            
-            const captionsContainer = document.getElementById('captions-container');
-            generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
-            generateBtn.disabled = true;
-            captionsContainer.innerHTML = '<div class="loading-animation"></div>';
-            
-            try {
-                const response = await fetch('/generate', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `topic=${topic}&count=10`
-                });
-                
-                const data = await response.json();
-                
-                if (data.error) {
-                    alert(data.error);
-                    return;
-                }
-                
-                captionsContainer.innerHTML = '';
-                
-                if (data.captions.length === 0) {
-                    captionsContainer.innerHTML = '<p class="no-results">No captions found for this topic. Try another one.</p>';
-                    return;
-                }
-                
-                data.captions.forEach(caption => {
-                    const card = document.createElement('div');
-                    card.className = 'caption-card';
-                    card.innerHTML = `
-                        <p class="caption-text">${caption}</p>
-                        <button class="copy-btn" onclick="copyToClipboard('${caption.replace(/'/g, "\\'")}')">
-                            <i class="far fa-copy"></i> Copy
-                        </button>
-                    `;
-                    captionsContainer.appendChild(card);
-                });
-                
-            } catch (error) {
-                console.error('Error:', error);
-                captionsContainer.innerHTML = '<p class="error-message">Failed to generate captions. Please try again.</p>';
-            } finally {
-                generateBtn.innerHTML = '<i class="fas fa-magic"></i> Generate Captions';
-                generateBtn.disabled = false;
-            }
-        }
-        
-        function copyToClipboard(text) {
-            navigator.clipboard.writeText(text).then(() => {
-                alert('Caption copied to clipboard!');
-            }).catch(err => {
-                console.error('Failed to copy: ', err);
             });
         }
     </script>
